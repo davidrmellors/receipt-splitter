@@ -3,6 +3,12 @@
 import { useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase'
 import { motion } from 'framer-motion'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Loader2 } from 'lucide-react'
 
 interface AuthFormProps {
   mode: 'signin' | 'signup'
@@ -58,97 +64,115 @@ export default function AuthForm({ mode }: AuthFormProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg"
+      className="w-full max-w-md mx-auto"
     >
-      <h2 className="text-2xl font-bold text-center mb-6 text-gray-900">
-        {mode === 'signup' ? 'Sign Up' : 'Sign In'}
-      </h2>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center">
+            {mode === 'signup' ? 'Sign Up' : 'Sign In'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {mode === 'signup' && (
-          <div>
-            <label htmlFor="fullName" className="block text-sm font-medium text-gray-900 mb-1">
-              Full Name
-            </label>
-            <input
-              id="fullName"
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              placeholder="Enter your full name"
-            />
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === 'signup' && (
+              <div className="space-y-2">
+                <Label htmlFor="fullName">
+                  Full Name
+                </Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  placeholder="Enter your full name"
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email">
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="Enter your email"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">
+                Password
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                placeholder="Enter your password"
+              />
+            </div>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {message && (
+              <Alert>
+                <AlertDescription>{message}</AlertDescription>
+              </Alert>
+            )}
+
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full"
+                size="lg"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  mode === 'signup' ? 'Sign Up' : 'Sign In'
+                )}
+              </Button>
+            </motion.div>
+          </form>
+
+          <div className="mt-4 text-center">
+            {mode === 'signup' ? (
+              <p className="text-sm text-muted-foreground">
+                Already have an account?{' '}
+                <a href="/signin" className="text-primary hover:underline">
+                  Sign in
+                </a>
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Don&apos;t have an account?{' '}
+                <a href="/signup" className="text-primary hover:underline">
+                  Sign up
+                </a>
+              </p>
+            )}
           </div>
-        )}
-
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-1">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-            placeholder="Enter your email"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-1">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-            placeholder="Enter your password"
-          />
-        </div>
-
-        {error && (
-          <div className="text-red-600 text-sm text-center">{error}</div>
-        )}
-
-        {message && (
-          <div className="text-green-600 text-sm text-center">{message}</div>
-        )}
-
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          type="submit"
-          disabled={loading}
-          className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Loading...' : mode === 'signup' ? 'Sign Up' : 'Sign In'}
-        </motion.button>
-      </form>
-
-      <div className="mt-4 text-center">
-        {mode === 'signup' ? (
-          <p className="text-sm text-gray-600">
-            Already have an account?{' '}
-            <a href="/signin" className="text-blue-600 hover:underline">
-              Sign in
-            </a>
-          </p>
-        ) : (
-          <p className="text-sm text-gray-600">
-            Don&apos;t have an account?{' '}
-            <a href="/signup" className="text-blue-600 hover:underline">
-              Sign up
-            </a>
-          </p>
-        )}
-      </div>
+        </CardContent>
+      </Card>
     </motion.div>
   )
 }

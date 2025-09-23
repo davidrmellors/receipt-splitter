@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Plus, Users, Camera, Loader2 } from 'lucide-react'
 
 interface Group {
   id: string
@@ -82,95 +86,103 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
+    <div className="min-h-screen bg-background">
+      <header className="border-b bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <h1 className="text-xl font-bold text-gray-900">Receipt Splitter</h1>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">
+            <h1 className="text-xl font-bold">Receipt Splitter</h1>
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <span className="text-sm text-muted-foreground hidden sm:inline">
                 {user?.email}
               </span>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleSignOut}
-                className="text-sm text-gray-500 hover:text-gray-700"
               >
                 Sign Out
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">Your Groups</h2>
-          <Link
-            href="/groups/new"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Create Group
-          </Link>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 sm:mb-8">
+          <h2 className="text-2xl font-bold">Your Groups</h2>
+          <Button asChild>
+            <Link href="/groups/new">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Group
+            </Link>
+          </Button>
         </div>
 
         {groups.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-16"
+            className="text-center py-12 sm:py-16"
           >
-            <div className="text-gray-400 text-6xl mb-4">👥</div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No groups yet</h3>
-            <p className="text-gray-600 mb-6">
+            <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">No groups yet</h3>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Create your first group to start splitting receipts with friends.
             </p>
-            <Link
-              href="/groups/new"
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-block"
-            >
-              Create Your First Group
-            </Link>
+            <Button asChild size="lg">
+              <Link href="/groups/new">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Your First Group
+              </Link>
+            </Button>
           </motion.div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {groups.map((group, index) => (
               <motion.div
                 key={group.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow"
               >
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">{group.name}</h3>
-                  <span className="text-sm text-gray-500">{group.member_count} members</span>
-                </div>
-
-                {group.description && (
-                  <p className="text-gray-600 text-sm mb-4">{group.description}</p>
-                )}
-
-                <div className="flex space-x-2">
-                  <Link
-                    href={`/groups/${group.id}`}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white text-center rounded-md hover:bg-blue-700 transition-colors text-sm"
-                  >
-                    View Group
-                  </Link>
-                  <Link
-                    href={`/groups/${group.id}/scan`}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm"
-                  >
-                    Scan Receipt
-                  </Link>
-                </div>
+                <Card className="h-full hover:shadow-lg transition-shadow duration-200">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-lg leading-tight">{group.name}</CardTitle>
+                      <Badge variant="secondary" className="ml-2 shrink-0">
+                        <Users className="w-3 h-3 mr-1" />
+                        {group.member_count}
+                      </Badge>
+                    </div>
+                    {group.description && (
+                      <CardDescription className="text-sm">
+                        {group.description}
+                      </CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Button asChild className="flex-1" size="sm">
+                        <Link href={`/groups/${group.id}`}>
+                          View Group
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-none">
+                        <Link href={`/groups/${group.id}/scan`}>
+                          <Camera className="w-4 h-4 sm:mr-0 mr-2" />
+                          <span className="sm:hidden">Scan Receipt</span>
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </motion.div>
             ))}
           </div>

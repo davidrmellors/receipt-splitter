@@ -7,6 +7,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import CameraCapture from '@/components/camera/CameraCapture'
 import FileUpload from '@/components/camera/FileUpload'
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ArrowLeft, Camera, Upload, CheckCircle, Loader2, AlertTriangle, Lightbulb } from 'lucide-react'
 
 export default function ScanReceipt() {
   const params = useParams()
@@ -68,18 +72,20 @@ export default function ScanReceipt() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-sm border p-6 max-w-md w-full text-center">
-          <div className="text-red-500 text-4xl mb-4">⚠️</div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Camera Access Required</h3>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <Link
-            href={`/groups/${groupId}`}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Back to Group
-          </Link>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center p-6">
+            <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <CardTitle className="mb-2">Camera Access Required</CardTitle>
+            <CardDescription className="mb-6">{error}</CardDescription>
+            <Button asChild>
+              <Link href={`/groups/${groupId}`}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Group
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -87,18 +93,21 @@ export default function ScanReceipt() {
   return (
     <>
       {!showCamera && (
-        <div className="min-h-screen bg-gray-50">
-          <header className="bg-white shadow-sm border-b">
+        <div className="min-h-screen bg-background">
+          <header className="border-b bg-card">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center h-16">
-                <Link href={`/groups/${groupId}`} className="text-xl font-bold text-gray-900">
-                  ← Back to Group
-                </Link>
+              <div className="flex items-center h-16">
+                <Button variant="ghost" asChild className="text-xl font-bold p-0">
+                  <Link href={`/groups/${groupId}`}>
+                    <ArrowLeft className="w-5 h-5 mr-2" />
+                    Back to Group
+                  </Link>
+                </Button>
               </div>
             </div>
           </header>
 
-          <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
             <AnimatePresence mode="wait">
               {processing ? (
                 <motion.div
@@ -106,13 +115,16 @@ export default function ScanReceipt() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="text-center py-16"
                 >
-                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-6"></div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Processing Receipt</h3>
-                  <p className="text-gray-600">
-                    Using AI to extract items from your receipt...
-                  </p>
+                  <Card>
+                    <CardContent className="text-center py-16">
+                      <Loader2 className="h-16 w-16 animate-spin text-primary mx-auto mb-6" />
+                      <CardTitle className="mb-2">Processing Receipt</CardTitle>
+                      <CardDescription>
+                        Using AI to extract items from your receipt...
+                      </CardDescription>
+                    </CardContent>
+                  </Card>
                 </motion.div>
               ) : capturedImage ? (
                 <motion.div
@@ -120,32 +132,39 @@ export default function ScanReceipt() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className="bg-white rounded-lg shadow-sm border p-6"
                 >
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Receipt Preview</h2>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-2xl">Receipt Preview</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="mb-6">
+                        <img
+                          src={capturedImage}
+                          alt="Captured receipt"
+                          className="w-full max-w-md mx-auto rounded-lg shadow-sm border"
+                        />
+                      </div>
 
-                  <div className="mb-6">
-                    <img
-                      src={capturedImage}
-                      alt="Captured receipt"
-                      className="w-full max-w-md mx-auto rounded-lg shadow-sm"
-                    />
-                  </div>
-
-                  <div className="flex space-x-4">
-                    <button
-                      onClick={handleRetake}
-                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                    >
-                      Retake Photo
-                    </button>
-                    <button
-                      onClick={() => handleCapture(capturedImage)}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                    >
-                      Process Receipt
-                    </button>
-                  </div>
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        <Button
+                          variant="outline"
+                          onClick={handleRetake}
+                          className="flex-1"
+                        >
+                          <Camera className="w-4 h-4 mr-2" />
+                          Retake Photo
+                        </Button>
+                        <Button
+                          onClick={() => handleCapture(capturedImage)}
+                          className="flex-1"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Process Receipt
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </motion.div>
               ) : (
                 <motion.div
@@ -153,64 +172,80 @@ export default function ScanReceipt() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className="text-center py-16"
                 >
-                  <div className="text-blue-600 text-6xl mb-6">📱</div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Scan Your Receipt</h2>
-                  <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                    Take a clear photo of your receipt. Our AI will extract all the items automatically.
-                  </p>
+                  <Card>
+                    <CardContent className="text-center py-12 sm:py-16">
+                      <Camera className="h-16 w-16 text-primary mx-auto mb-6" />
+                      <CardTitle className="text-2xl mb-4">Scan Your Receipt</CardTitle>
+                      <CardDescription className="mb-8 max-w-md mx-auto">
+                        Take a clear photo of your receipt. Our AI will extract all the items automatically.
+                      </CardDescription>
 
-                  <div className="space-y-4 mb-8 text-left max-w-md mx-auto">
-                    <div className="flex items-start space-x-3">
-                      <div className="text-green-500 text-xl">✓</div>
-                      <div>
-                        <h4 className="font-medium text-gray-900">Good lighting</h4>
-                        <p className="text-sm text-gray-600">Make sure the receipt is well lit</p>
+                      <div className="space-y-4 mb-8 text-left max-w-md mx-auto">
+                        <div className="flex items-start space-x-3">
+                          <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                          <div>
+                            <h4 className="font-medium">Good lighting</h4>
+                            <p className="text-sm text-muted-foreground">Make sure the receipt is well lit</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-3">
+                          <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                          <div>
+                            <h4 className="font-medium">Flat surface</h4>
+                            <p className="text-sm text-muted-foreground">Place receipt on a flat surface</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-3">
+                          <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                          <div>
+                            <h4 className="font-medium">Full receipt</h4>
+                            <p className="text-sm text-muted-foreground">Capture the entire receipt in frame</p>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <div className="text-green-500 text-xl">✓</div>
-                      <div>
-                        <h4 className="font-medium text-gray-900">Flat surface</h4>
-                        <p className="text-sm text-gray-600">Place receipt on a flat surface</p>
+
+                      <div className="flex flex-col gap-4 max-w-sm mx-auto">
+                        <motion.div
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <Button
+                            onClick={() => setShowCamera(true)}
+                            size="lg"
+                            className="w-full"
+                          >
+                            <Camera className="w-5 h-5 mr-2" />
+                            Open Camera
+                          </Button>
+                        </motion.div>
+
+                        <motion.div
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <Button
+                            variant={isMobileSafari ? "default" : "outline"}
+                            onClick={() => setShowFileUpload(true)}
+                            size="lg"
+                            className="w-full"
+                          >
+                            <Upload className="w-5 h-5 mr-2" />
+                            Upload from Photos
+                          </Button>
+                        </motion.div>
+
+                        {isMobileSafari && (
+                          <Alert>
+                            <Lightbulb className="h-4 w-4" />
+                            <AlertDescription>
+                              On Safari iPhone: &ldquo;Upload from Photos&rdquo; is recommended for best results
+                            </AlertDescription>
+                          </Alert>
+                        )}
                       </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <div className="text-green-500 text-xl">✓</div>
-                      <div>
-                        <h4 className="font-medium text-gray-900">Full receipt</h4>
-                        <p className="text-sm text-gray-600">Capture the entire receipt in frame</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col space-y-4">
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setShowCamera(true)}
-                      className="px-8 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                    >
-                      📷 Open Camera
-                    </motion.button>
-
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setShowFileUpload(true)}
-                      className={`px-8 py-3 border-2 border-blue-600 text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors
-                        ${isMobileSafari ? 'bg-blue-50 border-blue-700' : ''}`}
-                    >
-                      📱 Upload from Photos
-                    </motion.button>
-
-                    {isMobileSafari && (
-                      <p className="text-sm text-orange-600 bg-orange-50 p-3 rounded-lg">
-                        💡 On Safari iPhone: "Upload from Photos" is recommended for best results
-                      </p>
-                    )}
-                  </div>
+                    </CardContent>
+                  </Card>
                 </motion.div>
               )}
             </AnimatePresence>

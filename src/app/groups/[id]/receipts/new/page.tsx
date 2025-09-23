@@ -6,6 +6,11 @@ import { createSupabaseBrowserClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import SwipeableItemCard from '@/components/receipt/SwipeableItemCard'
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardTitle } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, CheckCircle, ArrowRight, ArrowLeftIcon, Loader2, AlertTriangle, Save } from 'lucide-react'
 
 interface ReceiptItem {
   id: string
@@ -132,123 +137,136 @@ export default function NewReceipt() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Analyzing receipt...</p>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card>
+          <CardContent className="text-center py-12">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-muted-foreground">Analyzing receipt...</p>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-sm border p-6 max-w-md w-full text-center">
-          <div className="text-red-500 text-4xl mb-4">⚠️</div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Error</h3>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <Link
-            href={`/groups/${groupId}/scan`}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Try Again
-          </Link>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center p-6">
+            <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <CardTitle className="mb-2">Error</CardTitle>
+            <p className="text-muted-foreground mb-6">{error}</p>
+            <Button asChild>
+              <Link href={`/groups/${groupId}/scan`}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Try Again
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   if (processing) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Saving assignments...</p>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card>
+          <CardContent className="text-center py-12">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-muted-foreground">Saving assignments...</p>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="border-b bg-card/95 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link href={`/groups/${groupId}`} className="text-xl font-bold text-gray-900">
-              ← Back to Group
-            </Link>
-            <div className="text-sm text-gray-600">
+            <Button variant="ghost" asChild className="text-xl font-bold p-0">
+              <Link href={`/groups/${groupId}`}>
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Back to Group
+              </Link>
+            </Button>
+            <Badge variant="secondary">
               {totalAssignments} of {items.length} assigned
-            </div>
+            </Badge>
           </div>
         </div>
       </header>
 
       {/* Progress Bar */}
-      <div className="bg-white border-b">
+      <div className="bg-card/95 backdrop-blur border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative pt-4 pb-2">
-            <div className="flex items-center justify-between text-sm font-medium text-gray-600 mb-2">
+            <div className="flex items-center justify-between text-sm font-medium text-muted-foreground mb-2">
               <span>Progress</span>
               <span>{Math.round((totalAssignments / items.length) * 100)}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${(totalAssignments / items.length) * 100}%` }}
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              />
-            </div>
+            <Progress
+              value={(totalAssignments / items.length) * 100}
+              className="h-2"
+            />
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 py-8">
+      <main className="flex-1 py-6 sm:py-8">
         <AnimatePresence mode="wait">
           {allItemsAssigned ? (
             <motion.div
               key="summary"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="max-w-2xl mx-auto px-4 text-center"
+              className="max-w-2xl mx-auto px-4"
             >
-              <div className="bg-white rounded-lg shadow-lg p-8">
-                <div className="text-green-500 text-6xl mb-4">✅</div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">All Items Assigned!</h2>
-                <p className="text-gray-600 mb-8">
-                  You've successfully assigned all {items.length} items. Ready to save?
-                </p>
+              <Card className="shadow-lg">
+                <CardContent className="text-center p-6 sm:p-8">
+                  <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                  <CardTitle className="text-2xl mb-4">All Items Assigned!</CardTitle>
+                  <p className="text-muted-foreground mb-8">
+                    You&apos;ve successfully assigned all {items.length} items. Ready to save?
+                  </p>
 
-                {/* Assignment Summary */}
-                <div className="space-y-2 mb-8 text-left">
-                  {items.map(item => {
-                    const assignment = assignments[item.id]
-                    return (
-                      <div key={item.id} className="flex justify-between items-center py-2 border-b">
-                        <span className="font-medium">{item.name}</span>
-                        <span className="text-sm text-gray-600">
-                          {assignment?.type === 'self' && 'You'}
-                          {assignment?.type === 'member' && assignment.memberName}
-                          {assignment?.type === 'split' && 'Split evenly'}
-                          {assignment?.type === 'custom' && 'Custom split'}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
+                  {/* Assignment Summary */}
+                  <div className="space-y-2 mb-8 text-left">
+                    {items.map(item => {
+                      const assignment = assignments[item.id]
+                      return (
+                        <div key={item.id} className="flex justify-between items-center py-2 border-b last:border-0">
+                          <span className="font-medium">{item.name}</span>
+                          <Badge variant="outline">
+                            {assignment?.type === 'self' && 'You'}
+                            {assignment?.type === 'member' && assignment.memberName}
+                            {assignment?.type === 'split' && 'Split evenly'}
+                            {assignment?.type === 'custom' && 'Custom split'}
+                          </Badge>
+                        </div>
+                      )
+                    })}
+                  </div>
 
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleFinish}
-                  className="px-8 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                >
-                  Save Receipt
-                </motion.button>
-              </div>
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Button
+                      onClick={handleFinish}
+                      size="lg"
+                      className="px-8"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Receipt
+                    </Button>
+                  </motion.div>
+                </CardContent>
+              </Card>
             </motion.div>
           ) : currentItem ? (
             <motion.div
@@ -259,10 +277,10 @@ export default function NewReceipt() {
               className="max-w-lg mx-auto"
             >
               <div className="text-center mb-4 px-4">
-                <h2 className="text-lg font-semibold text-gray-900">
+                <h2 className="text-lg font-semibold">
                   Item {currentItemIndex + 1} of {items.length}
                 </h2>
-                <p className="text-sm text-gray-600 mt-2">
+                <p className="text-sm text-muted-foreground mt-2">
                   Swipe to assign this item
                 </p>
               </div>
@@ -275,25 +293,28 @@ export default function NewReceipt() {
               />
 
               {/* Skip/Back buttons */}
-              <div className="flex justify-center space-x-4 mt-6">
+              <div className="flex justify-center gap-4 mt-6 px-4">
                 {currentItemIndex > 0 && (
-                  <button
+                  <Button
+                    variant="outline"
                     onClick={() => setCurrentItemIndex(prev => prev - 1)}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                   >
-                    ← Previous
-                  </button>
+                    <ArrowLeftIcon className="w-4 h-4 mr-2" />
+                    Previous
+                  </Button>
                 )}
-                <button
+                <Button
+                  variant="outline"
                   onClick={() => {
                     if (currentItemIndex < items.length - 1) {
                       setCurrentItemIndex(prev => prev + 1)
                     }
                   }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  disabled={currentItemIndex >= items.length - 1}
                 >
                   Skip for now
-                </button>
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
               </div>
             </motion.div>
           ) : null}
