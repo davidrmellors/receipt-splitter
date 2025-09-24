@@ -95,7 +95,7 @@ export async function parseReceiptImage(imageData: string): Promise<ParsedReceip
       }))
 
       return parsedReceipt
-    } catch (parseError) {
+    } catch {
       console.error('Failed to parse OpenAI response:', content)
       throw new Error('Failed to parse receipt data')
     }

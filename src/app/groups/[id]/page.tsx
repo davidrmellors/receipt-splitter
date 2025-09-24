@@ -7,8 +7,6 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ArrowLeft, Users, Receipt, DollarSign, Plus, Trash2, Eye, FileText, Loader2, AlertTriangle } from 'lucide-react'
 
 interface Group {
@@ -42,7 +40,7 @@ export default function GroupPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [loading, setLoading] = useState(true)
-  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [currentUser, setCurrentUser] = useState<{ id: string; email?: string } | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   const supabase = createSupabaseBrowserClient()
@@ -66,7 +64,7 @@ export default function GroupPage() {
 
           // Process members data
           console.log('Raw members data:', data.members)
-          const processedMembers = data.members.map((member: any) => ({
+          const processedMembers = data.members.map((member: { id: string; nickname?: string }) => ({
             id: member.id,
             name: member.nickname || 'Unknown Member',
             avatar_url: null
@@ -146,7 +144,7 @@ export default function GroupPage() {
             <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <CardTitle className="mb-2">Group not found</CardTitle>
             <CardDescription className="mb-4">
-              The group you're looking for doesn't exist or you don't have access to it.
+              The group you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
             </CardDescription>
             <Button asChild>
               <Link href="/dashboard">

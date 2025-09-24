@@ -110,7 +110,12 @@ export async function GET(
     }
 
     // Get receipts for this group (empty for now)
-    const receipts: any[] = []
+    const receipts: Array<{
+      id: string;
+      amount: number;
+      description: string;
+      date: string;
+    }> = []
 
     return NextResponse.json({
       group: {

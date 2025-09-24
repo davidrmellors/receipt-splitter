@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { createSupabaseBrowserClient } from '@/lib/supabase'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -52,7 +51,6 @@ export default function GroupSummary() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedBalance, setSelectedBalance] = useState<Balance | null>(null)
 
-  const supabase = createSupabaseBrowserClient()
 
   useEffect(() => {
     // In a real app, this would fetch data from Supabase

@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { motion, PanInfo, useMotionValue, useTransform } from 'framer-motion'
-import { useSwipeable } from 'react-swipeable'
 
 interface ReceiptItem {
   id: string
@@ -55,7 +54,7 @@ export default function SwipeableItemCard({
     setIsDragging(true)
   }
 
-  const handleDragEnd = (event: any, info: PanInfo) => {
+  const handleDragEnd = (_event: Event, info: PanInfo) => {
     setIsDragging(false)
 
     const { offset, velocity } = info

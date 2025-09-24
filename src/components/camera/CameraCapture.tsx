@@ -36,9 +36,11 @@ export default function CameraCapture({ onCapture, onCancel }: CameraCaptureProp
     facingMode: { ideal: 'environment' } // Use back camera on mobile
   }
 
-  const handleUserMediaError = (error: CameraError) => {
+  const handleUserMediaError = (error: string | DOMException) => {
     console.error('Camera error:', error)
-    if (error.name === 'NotAllowedError') {
+    if (typeof error === 'string') {
+      setCameraError(error)
+    } else if (error.name === 'NotAllowedError') {
       setCameraError('Camera access was denied. Please allow camera access and try again.')
     } else if (error.name === 'NotFoundError') {
       setCameraError('No camera found. Please make sure your device has a camera.')

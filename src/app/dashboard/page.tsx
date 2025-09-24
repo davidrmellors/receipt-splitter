@@ -20,7 +20,7 @@ interface Group {
 export default function Dashboard() {
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
 
   const supabase = createSupabaseBrowserClient()
 
@@ -49,11 +49,11 @@ export default function Dashboard() {
 
           if (groupsData.length > 0) {
             // Get member counts for all groups
-            const groupIds = groupsData.map((g: any) => g.id).join(',')
+            const groupIds = groupsData.map((g: { id: string }) => g.id).join(',')
             const countsResponse = await fetch(`/api/groups/members-count?groupIds=${groupIds}`)
             const memberCounts = countsResponse.ok ? await countsResponse.json() : {}
 
-            setGroups(groupsData.map((group: any) => ({
+            setGroups(groupsData.map((group: { id: string; name: string; description?: string; created_at: string }) => ({
               id: group.id,
               name: group.name,
               description: group.description,

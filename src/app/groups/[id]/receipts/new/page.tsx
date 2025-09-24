@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
-import { createSupabaseBrowserClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import SwipeableItemCard from '@/components/receipt/SwipeableItemCard'
 import Link from 'next/link'
@@ -77,7 +76,7 @@ export default function NewReceipt() {
         const data = await response.json()
 
         // Convert parsed items to our format
-        const parsedItems: ReceiptItem[] = data.items.map((item: any, index: number) => ({
+        const parsedItems: ReceiptItem[] = data.items.map((item: { name: string; price: number; quantity?: number }, index: number) => ({
           id: `item-${index}`,
           name: item.name,
           price: item.price,
@@ -123,7 +122,7 @@ export default function NewReceipt() {
 
       // Redirect to group summary
       window.location.href = `/groups/${groupId}/summary`
-    } catch (error) {
+    } catch {
       setError('Failed to save receipt assignments')
     } finally {
       setProcessing(false)
@@ -131,7 +130,6 @@ export default function NewReceipt() {
   }
 
   const currentItem = items[currentItemIndex]
-  const isLastItem = currentItemIndex === items.length - 1
   const allItemsAssigned = items.every(item => assignments[item.id])
   const totalAssignments = Object.keys(assignments).length
 

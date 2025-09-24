@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
-import { createSupabaseBrowserClient } from '@/lib/supabase'
+import { useParams, useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import CameraCapture from '@/components/camera/CameraCapture'
 import FileUpload from '@/components/camera/FileUpload'
@@ -14,6 +14,7 @@ import { ArrowLeft, Camera, Upload, CheckCircle, Loader2, AlertTriangle, Lightbu
 
 export default function ScanReceipt() {
   const params = useParams()
+  const router = useRouter()
   const groupId = params.id as string
 
   const [showCamera, setShowCamera] = useState(false)
@@ -23,7 +24,6 @@ export default function ScanReceipt() {
   const [error, setError] = useState('')
   const [isMobileSafari, setIsMobileSafari] = useState(false)
 
-  const supabase = createSupabaseBrowserClient()
 
   useEffect(() => {
     // Detect mobile Safari
@@ -58,8 +58,8 @@ export default function ScanReceipt() {
       await new Promise(resolve => setTimeout(resolve, 2000))
 
       // Redirect to item assignment page
-      window.location.href = `/groups/${groupId}/receipts/new?image=${encodeURIComponent(imageSrc)}`
-    } catch (error) {
+      router.push(`/groups/${groupId}/receipts/new?image=${encodeURIComponent(imageSrc)}`)
+    } catch {
       setError('Failed to process receipt. Please try again.')
       setProcessing(false)
     }
@@ -139,9 +139,11 @@ export default function ScanReceipt() {
                     </CardHeader>
                     <CardContent>
                       <div className="mb-6">
-                        <img
+                        <Image
                           src={capturedImage}
                           alt="Captured receipt"
+                          width={400}
+                          height={256}
                           className="w-full max-w-md mx-auto rounded-lg shadow-sm border"
                         />
                       </div>
