@@ -19,6 +19,12 @@ interface Balance {
   net: number
 }
 
+interface Member {
+  id: string
+  nickname: string
+  user_id?: string | null
+}
+
 interface Receipt {
   id: string
   storeName: string
@@ -26,6 +32,8 @@ interface Receipt {
   total: number
   items: number
   status: 'pending' | 'settled'
+  assignments?: Record<string, { type: string; assignedTo?: string }>
+  itemDetails?: Array<{ id: string; name: string; price: number; quantity: number }>
 }
 
 interface Payment {
@@ -87,7 +95,7 @@ export default function GroupSummary() {
   }, [groupId])
 
   // Calculate balances from receipts and assignments
-  const calculateBalances = (receipts: any[], members: any[]): Balance[] => {
+  const calculateBalances = (receipts: Receipt[], members: Member[]): Balance[] => {
     const balanceMap: Record<string, { owes: number; owed: number; name: string }> = {}
 
     // Initialize balance map
@@ -105,9 +113,9 @@ export default function GroupSummary() {
         // Find who paid for the receipt (assume current user for now)
         const payerId = members.find(m => m.user_id)?.id
 
-        Object.entries(receipt.assignments).forEach(([itemId, assignment]: [string, any]) => {
+        Object.entries(receipt.assignments).forEach(([itemId, assignment]) => {
           // Find the actual item price from itemDetails
-          const item = receipt.itemDetails.find((item: any) => item.id === itemId)
+          const item = receipt.itemDetails?.find((receiptItem) => receiptItem.id === itemId)
           if (!item) return
 
           const itemPrice = item.price
@@ -127,11 +135,9 @@ export default function GroupSummary() {
             // Split evenly among all members
             const splitAmount = itemPrice / members.length
             members.forEach(member => {
-              if (member.id !== payerId && balanceMap[member.id]) {
+              if (member.id !== payerId && balanceMap[member.id] && payerId && balanceMap[payerId]) {
                 balanceMap[member.id].owes += splitAmount
-                if (balanceMap[payerId]) {
-                  balanceMap[payerId].owed += splitAmount
-                }
+                balanceMap[payerId].owed += splitAmount
               }
             })
           }

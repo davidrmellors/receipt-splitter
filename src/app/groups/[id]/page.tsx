@@ -31,8 +31,22 @@ interface Receipt {
   total: number
   items: number
   status: 'pending' | 'settled'
-  assignments?: any
-  itemDetails?: any[]
+  assignments?: Record<string, ItemAssignment>
+  itemDetails?: ReceiptItem[]
+}
+
+interface ItemAssignment {
+  type: 'self' | 'member' | 'split' | 'custom'
+  assignedTo?: string
+  memberName?: string
+  customSplit?: Array<{ userId: string; amount: number }>
+}
+
+interface ReceiptItem {
+  id: string
+  name: string
+  price: number
+  quantity: number
 }
 
 interface Balance {
@@ -111,10 +125,10 @@ export default function GroupPage() {
     }
 
     fetchGroupData()
-  }, [groupId])
+  }, [groupId, supabase.auth])
 
   // Calculate balances from receipts and assignments (copied from summary page)
-  const calculateBalances = (receipts: any[], members: any[]): Balance[] => {
+  const calculateBalances = (receipts: Receipt[], members: { id: string; nickname: string; user_id?: string | null }[]): Balance[] => {
     const balanceMap: Record<string, { owes: number; owed: number; name: string }> = {}
 
     // Initialize balance map
@@ -132,9 +146,9 @@ export default function GroupPage() {
         // Find who paid for the receipt (assume current user for now)
         const payerId = members.find(m => m.user_id)?.id
 
-        Object.entries(receipt.assignments).forEach(([itemId, assignment]: [string, any]) => {
+        Object.entries(receipt.assignments).forEach(([itemId, assignment]) => {
           // Find the actual item price from itemDetails
-          const item = receipt.itemDetails.find((item: any) => item.id === itemId)
+          const item = receipt.itemDetails?.find((receiptItem) => receiptItem.id === itemId)
           if (!item) return
 
           const itemPrice = item.price
@@ -154,11 +168,9 @@ export default function GroupPage() {
             // Split evenly among all members
             const splitAmount = itemPrice / members.length
             members.forEach(member => {
-              if (member.id !== payerId && balanceMap[member.id]) {
+              if (member.id !== payerId && balanceMap[member.id] && payerId && balanceMap[payerId]) {
                 balanceMap[member.id].owes += splitAmount
-                if (balanceMap[payerId]) {
-                  balanceMap[payerId].owed += splitAmount
-                }
+                balanceMap[payerId].owed += splitAmount
               }
             })
           }
@@ -223,7 +235,7 @@ export default function GroupPage() {
 
     // Update localStorage
     const existingReceipts = JSON.parse(localStorage.getItem(`receipts_${groupId}`) || '[]')
-    const updatedReceipts = existingReceipts.map((receipt: any) =>
+    const updatedReceipts = existingReceipts.map((receipt: Receipt) =>
       receipt.id === editingReceipt.id
         ? {
             ...receipt,
@@ -258,7 +270,7 @@ export default function GroupPage() {
 
     // Remove from localStorage
     const existingReceipts = JSON.parse(localStorage.getItem(`receipts_${groupId}`) || '[]')
-    const updatedReceipts = existingReceipts.filter((receipt: any) => receipt.id !== deletingReceipt.id)
+    const updatedReceipts = existingReceipts.filter((receipt: Receipt) => receipt.id !== deletingReceipt.id)
     localStorage.setItem(`receipts_${groupId}`, JSON.stringify(updatedReceipts))
 
     // Update local state
@@ -647,7 +659,7 @@ export default function GroupPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-6">
-                  Are you sure you want to delete &ldquo;{group?.name}&rdquo;? This action cannot be undone.
+                  Are you sure you want to delete &quot;{group?.name}&quot;? This action cannot be undone.
                   All receipts and data in this group will be permanently lost.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -737,7 +749,7 @@ export default function GroupPage() {
                   </div>
 
                   <div className="space-y-3 max-h-60 overflow-y-auto">
-                    {editForm.items.map((item, index) => (
+                    {editForm.items.map((item) => (
                       <div key={item.id} className="flex gap-2 items-center p-3 border rounded-lg bg-gray-50">
                         <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
                           <input
@@ -781,7 +793,7 @@ export default function GroupPage() {
                   {editForm.items.length === 0 && (
                     <div className="text-center py-8 text-muted-foreground">
                       <p className="mb-2">No items yet</p>
-                      <p className="text-sm">Click "Add Item" to start adding items</p>
+                      <p className="text-sm">Click &quot;Add Item&quot; to start adding items</p>
                     </div>
                   )}
                 </div>

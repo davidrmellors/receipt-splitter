@@ -9,10 +9,10 @@ interface CameraCaptureProps {
   onCancel: () => void
 }
 
-interface CameraError {
-  name: string
-  message: string
-}
+// interface CameraError {
+//   name: string
+//   message: string
+// }
 
 export default function CameraCapture({ onCapture, onCancel }: CameraCaptureProps) {
   const webcamRef = useRef<Webcam>(null)

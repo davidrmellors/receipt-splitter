@@ -56,12 +56,12 @@ export default function NewReceipt() {
           const members = await response.json()
 
           // Find current user (member with user_id)
-          const currentMember = members.find((member: any) => member.user_id)
+          const currentMember = members.find((member: { user_id?: string | null }) => member.user_id)
 
           // Transform to expected format, excluding current user from groupMembers
           const transformedMembers = members
-            .filter((member: any) => member.id !== currentMember?.id) // Exclude current user
-            .map((member: any) => ({
+            .filter((member: { id: string }) => member.id !== currentMember?.id) // Exclude current user
+            .map((member: { id: string; nickname: string }) => ({
               id: member.id,
               name: member.nickname
             }))
@@ -534,7 +534,7 @@ export default function NewReceipt() {
                 </div>
 
                 <div className="space-y-4 max-h-60 overflow-y-auto mb-6">
-                  {items.map((item, index) => (
+                  {items.map((item) => (
                     <div key={item.id} className="flex gap-3 items-center p-4 border rounded-lg bg-gray-50">
                       <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
@@ -590,7 +590,7 @@ export default function NewReceipt() {
                 {items.length === 0 && (
                   <div className="text-center py-12 text-muted-foreground">
                     <p className="mb-2">No items yet</p>
-                    <p className="text-sm">Click "Add Item" to start adding items to your receipt</p>
+                    <p className="text-sm">Click &quot;Add Item&quot; to start adding items to your receipt</p>
                   </div>
                 )}
 

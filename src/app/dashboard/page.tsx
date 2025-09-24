@@ -77,7 +77,7 @@ export default function Dashboard() {
 
     getUser()
     fetchGroups()
-  }, [])
+  }, [supabase.auth])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()

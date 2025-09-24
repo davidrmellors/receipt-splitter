@@ -43,7 +43,6 @@ export async function POST(request: NextRequest) {
 
     // Create receipt items and assignments
     const receiptItems = []
-    const itemAssignments = []
 
     for (const item of items) {
       const assignment = assignments[item.id]
