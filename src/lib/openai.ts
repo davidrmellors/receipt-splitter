@@ -1,32 +1,34 @@
-import OpenAI from 'openai'
+import OpenAI from "openai";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-})
+});
 
 export interface ReceiptItem {
-  name: string
-  price: number
-  quantity?: number
-  category?: string
+  name: string;
+  price: number;
+  quantity?: number;
+  category?: string;
 }
 
 export interface ParsedReceipt {
-  storeName?: string
-  date?: string
-  items: ReceiptItem[]
-  subtotal?: number
-  tax?: number
-  total?: number
+  storeName?: string;
+  date?: string;
+  items: ReceiptItem[];
+  subtotal?: number;
+  tax?: number;
+  total?: number;
 }
 
-export async function parseReceiptImage(imageData: string): Promise<ParsedReceipt> {
+export async function parseReceiptImage(
+  imageData: string,
+): Promise<ParsedReceipt> {
   try {
-    // Remove data:image/jpeg;base64, prefix if present
-    const base64Image = imageData.replace(/^data:image\/[a-z]+;base64,/, '')
+    // Remove data:image/jpeg;base64, prefix if present to get raw base64
+    const base64Image = imageData.replace(/^data:image\/[a-z]+;base64,/, "");
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "user",
@@ -56,51 +58,54 @@ export async function parseReceiptImage(imageData: string): Promise<ParsedReceip
               - Convert all prices to numbers (remove currency symbols)
               - If quantity is not specified, assume 1
               - Categorize items as food, drink, or other
-              - Return valid JSON only, no additional text`
+              - Return valid JSON only, no additional text`,
             },
             {
               type: "image_url",
               image_url: {
-                url: `data:image/jpeg;base64,${base64Image}`
-              }
-            }
-          ]
-        }
+                url: `data:image/jpeg;base64,${base64Image}`,
+              },
+            },
+          ],
+        },
       ],
-      max_tokens: 1000,
-    })
+      max_completion_tokens: 1000,
+    });
 
-    const content = response.choices[0]?.message?.content
+    const content = response.choices[0]?.message?.content;
     if (!content) {
-      throw new Error('No response from OpenAI')
+      throw new Error("No response from OpenAI");
     }
 
     try {
-      const parsedReceipt: ParsedReceipt = JSON.parse(content)
+      // Remove markdown code blocks if present
+      const cleanContent = content.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim()
+      const parsedReceipt: ParsedReceipt = JSON.parse(cleanContent);
 
       // Validate the response
       if (!parsedReceipt.items || !Array.isArray(parsedReceipt.items)) {
-        throw new Error('Invalid receipt format: missing items array')
+        throw new Error("Invalid receipt format: missing items array");
       }
 
       // Validate each item
-      parsedReceipt.items = parsedReceipt.items.filter(item =>
-        item.name &&
-        typeof item.price === 'number' &&
-        item.price > 0
-      ).map(item => ({
-        ...item,
-        quantity: item.quantity || 1,
-        category: item.category || 'other'
-      }))
+      parsedReceipt.items = parsedReceipt.items
+        .filter(
+          (item) =>
+            item.name && typeof item.price === "number" && item.price > 0,
+        )
+        .map((item) => ({
+          ...item,
+          quantity: item.quantity || 1,
+          category: item.category || "other",
+        }));
 
-      return parsedReceipt
+      return parsedReceipt;
     } catch {
-      console.error('Failed to parse OpenAI response:', content)
-      throw new Error('Failed to parse receipt data')
+      console.error("Failed to parse OpenAI response:", content);
+      throw new Error("Failed to parse receipt data");
     }
   } catch (error) {
-    console.error('OpenAI API error:', error)
-    throw new Error('Failed to process receipt image')
+    console.error("OpenAI API error:", error);
+    throw new Error("Failed to process receipt image");
   }
 }

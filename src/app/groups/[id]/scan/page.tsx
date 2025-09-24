@@ -57,8 +57,12 @@ export default function ScanReceipt() {
       // For now, simulate processing
       await new Promise(resolve => setTimeout(resolve, 2000))
 
-      // Redirect to item assignment page
-      router.push(`/groups/${groupId}/receipts/new?image=${encodeURIComponent(imageSrc)}`)
+      // Store image data in sessionStorage to avoid URL length limits
+      const imageId = `receipt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      sessionStorage.setItem(imageId, imageSrc)
+
+      // Redirect to item assignment page with image ID instead of data
+      router.push(`/groups/${groupId}/receipts/new?imageId=${imageId}`)
     } catch {
       setError('Failed to process receipt. Please try again.')
       setProcessing(false)

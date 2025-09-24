@@ -5,6 +5,42 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const supabase = createClient(supabaseUrl, supabaseKey)
 
+// Get group members
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: groupId } = await params
+
+    console.log('Fetching members for group:', groupId)
+
+    const { data: members, error } = await supabase
+      .from('group_members')
+      .select('id, nickname, user_id, joined_at')
+      .eq('group_id', groupId)
+      .order('joined_at')
+
+    if (error) {
+      console.error('Error fetching group members:', error)
+      return NextResponse.json(
+        { error: 'Failed to fetch group members' },
+        { status: 500 }
+      )
+    }
+
+    console.log('Found members:', members)
+
+    return NextResponse.json(members || [])
+  } catch (error: unknown) {
+    console.error('Group members fetch error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch group members' },
+      { status: 500 }
+    )
+  }
+}
+
 // Remove a member from a group
 export async function DELETE(
   request: NextRequest,

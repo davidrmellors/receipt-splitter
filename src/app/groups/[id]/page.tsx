@@ -7,7 +7,8 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, Users, Receipt, DollarSign, Plus, Trash2, Eye, FileText, Loader2, AlertTriangle } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, Users, Receipt, DollarSign, Plus, Trash2, Eye, FileText, Loader2, AlertTriangle, Clock, Edit } from 'lucide-react'
 
 interface Group {
   id: string
@@ -28,8 +29,18 @@ interface Receipt {
   storeName: string
   date: string
   total: number
-  uploadedBy: string
-  uploaderName: string
+  items: number
+  status: 'pending' | 'settled'
+  assignments?: any
+  itemDetails?: any[]
+}
+
+interface Balance {
+  userId: string
+  userName: string
+  owes: number
+  owed: number
+  net: number
 }
 
 export default function GroupPage() {
@@ -39,9 +50,18 @@ export default function GroupPage() {
   const [group, setGroup] = useState<Group | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [receipts, setReceipts] = useState<Receipt[]>([])
+  const [balances, setBalances] = useState<Balance[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUser, setCurrentUser] = useState<{ id: string; email?: string } | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [editingReceipt, setEditingReceipt] = useState<Receipt | null>(null)
+  const [deletingReceipt, setDeletingReceipt] = useState<Receipt | null>(null)
+  const [editForm, setEditForm] = useState<{
+    storeName: string
+    date: string
+    total: number
+    items: Array<{ id: string; name: string; price: number; quantity: number }>
+  }>({ storeName: '', date: '', total: 0, items: [] })
 
   const supabase = createSupabaseBrowserClient()
 
@@ -71,7 +91,15 @@ export default function GroupPage() {
           }))
           setMembers(processedMembers)
 
-          setReceipts(data.receipts)
+          // Fetch receipts from localStorage (same as summary page)
+          const localReceipts = JSON.parse(localStorage.getItem(`receipts_${groupId}`) || '[]')
+          setReceipts(localReceipts)
+
+          // Calculate balances if we have receipts
+          if (localReceipts.length > 0) {
+            const balances = calculateBalances(localReceipts, data.members)
+            setBalances(balances)
+          }
         } else {
           console.error('Failed to fetch group data')
         }
@@ -84,6 +112,169 @@ export default function GroupPage() {
 
     fetchGroupData()
   }, [groupId])
+
+  // Calculate balances from receipts and assignments (copied from summary page)
+  const calculateBalances = (receipts: any[], members: any[]): Balance[] => {
+    const balanceMap: Record<string, { owes: number; owed: number; name: string }> = {}
+
+    // Initialize balance map
+    members.forEach(member => {
+      balanceMap[member.id] = {
+        owes: 0,
+        owed: 0,
+        name: member.nickname === 'You' ? 'You' : member.nickname
+      }
+    })
+
+    // Process each receipt's assignments
+    receipts.forEach(receipt => {
+      if (receipt.assignments && receipt.itemDetails) {
+        // Find who paid for the receipt (assume current user for now)
+        const payerId = members.find(m => m.user_id)?.id
+
+        Object.entries(receipt.assignments).forEach(([itemId, assignment]: [string, any]) => {
+          // Find the actual item price from itemDetails
+          const item = receipt.itemDetails.find((item: any) => item.id === itemId)
+          if (!item) return
+
+          const itemPrice = item.price
+
+          if (assignment.type === 'self') {
+            // Current user owes themselves nothing
+            // No balance change needed
+          } else if (assignment.type === 'member' && assignment.assignedTo) {
+            // Someone else was assigned this item - they owe the payer
+            if (balanceMap[assignment.assignedTo] && payerId) {
+              balanceMap[assignment.assignedTo].owes += itemPrice
+              if (balanceMap[payerId]) {
+                balanceMap[payerId].owed += itemPrice
+              }
+            }
+          } else if (assignment.type === 'split') {
+            // Split evenly among all members
+            const splitAmount = itemPrice / members.length
+            members.forEach(member => {
+              if (member.id !== payerId && balanceMap[member.id]) {
+                balanceMap[member.id].owes += splitAmount
+                if (balanceMap[payerId]) {
+                  balanceMap[payerId].owed += splitAmount
+                }
+              }
+            })
+          }
+        })
+      }
+    })
+
+    // Convert to Balance array format
+    return Object.entries(balanceMap).map(([userId, balance]) => ({
+      userId,
+      userName: balance.name,
+      owes: Math.round(balance.owes * 100) / 100, // Round to 2 decimal places
+      owed: Math.round(balance.owed * 100) / 100,
+      net: Math.round((balance.owed - balance.owes) * 100) / 100
+    })).filter(balance => balance.owes > 0 || balance.owed > 0) // Only show balances with amounts
+  }
+
+  const handleEditReceipt = (receipt: Receipt) => {
+    setEditingReceipt(receipt)
+    setEditForm({
+      storeName: receipt.storeName,
+      date: receipt.date,
+      total: receipt.total,
+      items: receipt.itemDetails || []
+    })
+  }
+
+  const handleAddItem = () => {
+    const newItem = {
+      id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: '',
+      price: 0,
+      quantity: 1
+    }
+    setEditForm(prev => ({
+      ...prev,
+      items: [...prev.items, newItem]
+    }))
+  }
+
+  const handleRemoveItem = (itemId: string) => {
+    setEditForm(prev => ({
+      ...prev,
+      items: prev.items.filter(item => item.id !== itemId)
+    }))
+  }
+
+  const handleItemChange = (itemId: string, field: string, value: string | number) => {
+    setEditForm(prev => ({
+      ...prev,
+      items: prev.items.map(item =>
+        item.id === itemId ? { ...item, [field]: value } : item
+      )
+    }))
+  }
+
+  const handleSaveReceipt = () => {
+    if (!editingReceipt) return
+
+    // Calculate total from items
+    const calculatedTotal = editForm.items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+
+    // Update localStorage
+    const existingReceipts = JSON.parse(localStorage.getItem(`receipts_${groupId}`) || '[]')
+    const updatedReceipts = existingReceipts.map((receipt: any) =>
+      receipt.id === editingReceipt.id
+        ? {
+            ...receipt,
+            storeName: editForm.storeName,
+            date: editForm.date,
+            total: calculatedTotal,
+            items: editForm.items.length,
+            itemDetails: editForm.items
+          }
+        : receipt
+    )
+
+    localStorage.setItem(`receipts_${groupId}`, JSON.stringify(updatedReceipts))
+
+    // Update local state
+    setReceipts(updatedReceipts)
+
+    // Recalculate balances
+    const processedMembers = members.map(member => ({
+      id: member.id,
+      nickname: member.name,
+      user_id: member.name === 'You' ? 'current-user' : null
+    }))
+    const newBalances = calculateBalances(updatedReceipts, processedMembers)
+    setBalances(newBalances)
+
+    setEditingReceipt(null)
+  }
+
+  const handleDeleteReceipt = () => {
+    if (!deletingReceipt) return
+
+    // Remove from localStorage
+    const existingReceipts = JSON.parse(localStorage.getItem(`receipts_${groupId}`) || '[]')
+    const updatedReceipts = existingReceipts.filter((receipt: any) => receipt.id !== deletingReceipt.id)
+    localStorage.setItem(`receipts_${groupId}`, JSON.stringify(updatedReceipts))
+
+    // Update local state
+    setReceipts(updatedReceipts)
+
+    // Recalculate balances
+    const processedMembers = members.map(member => ({
+      id: member.id,
+      nickname: member.name,
+      user_id: member.name === 'You' ? 'current-user' : null
+    }))
+    const newBalances = calculateBalances(updatedReceipts, processedMembers)
+    setBalances(newBalances)
+
+    setDeletingReceipt(null)
+  }
 
   const handleRemoveMember = async (memberId: string) => {
     if (!currentUser) return
@@ -171,13 +362,6 @@ export default function GroupPage() {
               </Link>
             </Button>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/groups/${groupId}/summary`}>
-                  <Eye className="w-4 h-4 mr-2" />
-                  <span className="hidden sm:inline">View Summary</span>
-                  <span className="sm:hidden">Summary</span>
-                </Link>
-              </Button>
               <Button size="sm" asChild>
                 <Link href={`/groups/${groupId}/scan`}>
                   <FileText className="w-4 h-4 mr-2" />
@@ -216,7 +400,7 @@ export default function GroupPage() {
             </CardHeader>
             <CardContent>
               {/* Quick Stats */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-4">
+              <div className="grid grid-cols-4 gap-2 sm:gap-4">
                 <div className="text-center">
                   <div className="flex items-center justify-center mb-1">
                     <Users className="w-5 h-5 text-primary mr-1" />
@@ -236,9 +420,18 @@ export default function GroupPage() {
                     <DollarSign className="w-5 h-5 text-purple-600 mr-1" />
                   </div>
                   <div className="text-lg sm:text-2xl font-bold text-purple-600">
-                    ${receipts.reduce((sum, r) => sum + r.total, 0).toFixed(2)}
+                    R{receipts.reduce((sum, r) => sum + r.total, 0).toFixed(2)}
                   </div>
                   <div className="text-xs sm:text-sm text-muted-foreground">Total Spent</div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-1">
+                    <Clock className="w-5 h-5 text-orange-600 mr-1" />
+                  </div>
+                  <div className="text-lg sm:text-2xl font-bold text-orange-600">
+                    {receipts.filter(r => r.status === 'pending').length}
+                  </div>
+                  <div className="text-xs sm:text-sm text-muted-foreground">Pending</div>
                 </div>
               </div>
             </CardContent>
@@ -250,7 +443,7 @@ export default function GroupPage() {
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="lg:col-span-1"
+            className="lg:col-span-1 space-y-6"
           >
             <Card>
               <CardHeader>
@@ -295,6 +488,53 @@ export default function GroupPage() {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Balances */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                  <DollarSign className="w-5 h-5 mr-2" />
+                  Balances
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {balances.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-4">
+                    <p className="text-sm mb-2">No balances yet</p>
+                    <p className="text-xs">Balances will appear after adding receipts</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {balances.map((balance) => (
+                      <div key={balance.userId} className="flex items-center justify-between p-2 rounded-lg hover:bg-accent transition-colors">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                            <span className="text-primary font-medium text-xs">
+                              {balance.userName.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="font-medium text-sm">{balance.userName}</div>
+                            <div className="text-xs text-muted-foreground">
+                              Owes: R{balance.owes.toFixed(2)} • Owed: R{balance.owed.toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div
+                            className={`text-sm font-semibold ${
+                              balance.net > 0 ? 'text-green-600' : balance.net < 0 ? 'text-destructive' : 'text-muted-foreground'
+                            }`}
+                          >
+                            {balance.net > 0 ? '+' : ''}R{balance.net.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </motion.div>
 
           {/* Recent Receipts */}
@@ -305,17 +545,10 @@ export default function GroupPage() {
           >
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle className="text-lg flex items-center">
-                    <Receipt className="w-5 h-5 mr-2" />
-                    Recent Receipts
-                  </CardTitle>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/groups/${groupId}/summary`}>
-                      View All
-                    </Link>
-                  </Button>
-                </div>
+                <CardTitle className="text-lg flex items-center">
+                  <Receipt className="w-5 h-5 mr-2" />
+                  Recent Receipts
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 {receipts.length === 0 ? (
@@ -346,17 +579,39 @@ export default function GroupPage() {
                           <div className="flex-1">
                             <h3 className="font-medium">{receipt.storeName}</h3>
                             <p className="text-sm text-muted-foreground">
-                              Uploaded by {receipt.uploaderName} • {receipt.date}
+                              {receipt.items} items • {receipt.date}
                             </p>
                           </div>
                           <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2">
-                            <div className="font-semibold">
-                              ${receipt.total.toFixed(2)}
+                            <div className="flex items-center gap-2">
+                              <div className="font-semibold">R{receipt.total.toFixed(2)}</div>
+                              <Badge variant={receipt.status === 'settled' ? 'default' : 'secondary'} className="text-xs">
+                                {receipt.status === 'settled' ? 'Settled' : 'Pending'}
+                              </Badge>
                             </div>
-                            <Button variant="ghost" size="sm">
-                              <Eye className="w-4 h-4 mr-1" />
-                              Details
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditReceipt(receipt)}
+                              >
+                                <Edit className="w-4 h-4 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeletingReceipt(receipt)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4 mr-1" />
+                                Delete
+                              </Button>
+                              <Button variant="ghost" size="sm">
+                                <Eye className="w-4 h-4 mr-1" />
+                                Details
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </motion.div>
@@ -413,6 +668,216 @@ export default function GroupPage() {
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Delete Group
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Receipt Editing Modal */}
+      {editingReceipt && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setEditingReceipt(null)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-2xl max-h-[80vh] overflow-y-auto"
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Edit className="w-5 h-5 mr-2" />
+                  Edit Receipt: {editingReceipt.storeName}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Basic Receipt Info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Store Name</label>
+                    <input
+                      type="text"
+                      value={editForm.storeName}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, storeName: e.target.value }))}
+                      className="w-full px-3 py-2 border border-input rounded-md"
+                      placeholder="Enter store name"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Date</label>
+                    <input
+                      type="date"
+                      value={editForm.date}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, date: e.target.value }))}
+                      className="w-full px-3 py-2 border border-input rounded-md"
+                    />
+                  </div>
+                </div>
+
+                {/* Items Section */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <label className="text-sm font-medium">Items</label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddItem}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Item
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {editForm.items.map((item, index) => (
+                      <div key={item.id} className="flex gap-2 items-center p-3 border rounded-lg bg-gray-50">
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
+                          <input
+                            type="text"
+                            value={item.name}
+                            onChange={(e) => handleItemChange(item.id, 'name', e.target.value)}
+                            className="flex-1 px-3 py-2 border border-input rounded text-sm bg-white"
+                            placeholder="Item name"
+                          />
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={item.price}
+                            onChange={(e) => handleItemChange(item.id, 'price', parseFloat(e.target.value) || 0)}
+                            className="px-3 py-2 border border-input rounded text-sm bg-white"
+                            placeholder="Price"
+                          />
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => handleItemChange(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                            className="px-3 py-2 border border-input rounded text-sm bg-white"
+                            placeholder="Qty"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveItem(item.id)}
+                          className="text-destructive hover:text-destructive p-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {editForm.items.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p className="mb-2">No items yet</p>
+                      <p className="text-sm">Click "Add Item" to start adding items</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Calculated Total */}
+                <div className="p-4 bg-secondary/20 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Calculated Total:</span>
+                    <span className="text-lg font-bold">
+                      R{editForm.items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Total is automatically calculated from items above
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditingReceipt(null)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveReceipt}
+                    className="flex-1"
+                    disabled={editForm.items.length === 0 || !editForm.storeName.trim()}
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Delete Receipt Modal */}
+      {deletingReceipt && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setDeletingReceipt(null)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md"
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center text-destructive">
+                  <AlertTriangle className="w-5 h-5 mr-2" />
+                  Delete Receipt
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">
+                  Are you sure you want to delete the receipt from <strong>{deletingReceipt.storeName}</strong>?
+                </p>
+                <div className="bg-secondary/20 rounded-lg p-3 mb-6">
+                  <div className="flex justify-between text-sm">
+                    <span>Date:</span>
+                    <span>{deletingReceipt.date}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Items:</span>
+                    <span>{deletingReceipt.items} items</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-semibold">
+                    <span>Total:</span>
+                    <span>R{deletingReceipt.total.toFixed(2)}</span>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground mb-6">
+                  This action cannot be undone. All item assignments and balance calculations for this receipt will be removed.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setDeletingReceipt(null)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDeleteReceipt}
+                    className="flex-1"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Receipt
                   </Button>
                 </div>
               </CardContent>

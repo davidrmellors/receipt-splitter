@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, CheckCircle, ArrowRight, ArrowLeftIcon, Loader2, AlertTriangle, Save } from 'lucide-react'
+import { ArrowLeft, CheckCircle, ArrowRight, ArrowLeftIcon, Loader2, AlertTriangle, Save, Edit, Plus, Trash2 } from 'lucide-react'
 
 interface ReceiptItem {
   id: string
@@ -34,7 +34,8 @@ export default function NewReceipt() {
   const params = useParams()
   const searchParams = useSearchParams()
   const groupId = params.id as string
-  const imageData = searchParams.get('image')
+  const imageId = searchParams.get('imageId')
+  const legacyImageData = searchParams.get('image') // For backward compatibility
 
   const [items, setItems] = useState<ReceiptItem[]>([])
   const [currentItemIndex, setCurrentItemIndex] = useState(0)
@@ -42,19 +43,67 @@ export default function NewReceipt() {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState('')
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
+  const [currentUser, setCurrentUser] = useState<GroupMember | null>(null)
+  const [showEditItems, setShowEditItems] = useState(false)
 
-  // Mock data - in real app, this would come from Supabase
-  const [groupMembers] = useState<GroupMember[]>([
-    { id: '2', name: 'Alice' },
-    { id: '3', name: 'Bob' },
-    { id: '4', name: 'Charlie' }
-  ])
+  // Fetch group members
+  useEffect(() => {
+    const fetchGroupMembers = async () => {
+      try {
+        const response = await fetch(`/api/groups/${groupId}/members`)
+        if (response.ok) {
+          const members = await response.json()
 
-  const currentUser = { id: '1', name: 'You' }
+          // Find current user (member with user_id)
+          const currentMember = members.find((member: any) => member.user_id)
+
+          // Transform to expected format, excluding current user from groupMembers
+          const transformedMembers = members
+            .filter((member: any) => member.id !== currentMember?.id) // Exclude current user
+            .map((member: any) => ({
+              id: member.id,
+              name: member.nickname
+            }))
+
+          setGroupMembers(transformedMembers)
+
+          // Set current user
+          if (currentMember) {
+            setCurrentUser({
+              id: currentMember.id,
+              name: 'You'
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch group members:', error)
+        // Fallback to mock data
+        setGroupMembers([
+          { id: '2', name: 'Alice' },
+          { id: '3', name: 'Bob' }
+        ])
+        setCurrentUser({ id: '1', name: 'You' })
+      }
+    }
+
+    fetchGroupMembers()
+  }, [groupId])
 
   useEffect(() => {
     const parseReceipt = async () => {
-      if (!imageData) {
+      // Get image data from sessionStorage or URL param (legacy)
+      let imageData: string | null = null
+
+      if (imageId) {
+        imageData = sessionStorage.getItem(imageId)
+        if (!imageData) {
+          setError('Image data not found. Please try scanning again.')
+          return
+        }
+      } else if (legacyImageData) {
+        imageData = decodeURIComponent(legacyImageData)
+      } else {
         setError('No image data provided')
         return
       }
@@ -66,7 +115,7 @@ export default function NewReceipt() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ imageData: decodeURIComponent(imageData) }),
+          body: JSON.stringify({ imageData }),
         })
 
         if (!response.ok) {
@@ -75,15 +124,30 @@ export default function NewReceipt() {
 
         const data = await response.json()
 
-        // Convert parsed items to our format
-        const parsedItems: ReceiptItem[] = data.items.map((item: { name: string; price: number; quantity?: number }, index: number) => ({
-          id: `item-${index}`,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity || 1
-        }))
+        // Convert parsed items to our format and split items with quantity > 1
+        const parsedItems: ReceiptItem[] = []
+        data.items.forEach((item: { name: string; price: number; quantity?: number }, index: number) => {
+          const quantity = item.quantity || 1
+          // API already returns the price per single item, not total price
+          const pricePerItem = item.price
+
+          // Create separate items for each quantity
+          for (let i = 0; i < quantity; i++) {
+            parsedItems.push({
+              id: `item-${index}-${i}`,
+              name: quantity > 1 ? `${item.name} (${i + 1}/${quantity})` : item.name,
+              price: pricePerItem,
+              quantity: 1
+            })
+          }
+        })
 
         setItems(parsedItems)
+
+        // Clean up sessionStorage after successful processing
+        if (imageId) {
+          sessionStorage.removeItem(imageId)
+        }
       } catch (error) {
         console.error('Error parsing receipt:', error)
         // Fallback to mock data for demo
@@ -93,13 +157,18 @@ export default function NewReceipt() {
           { id: '3', name: 'Coke', price: 2.99, quantity: 2 },
           { id: '4', name: 'Pizza', price: 18.99, quantity: 1 }
         ])
+
+        // Clean up sessionStorage even on error
+        if (imageId) {
+          sessionStorage.removeItem(imageId)
+        }
       } finally {
         setLoading(false)
       }
     }
 
     parseReceipt()
-  }, [imageData])
+  }, [imageId, legacyImageData])
 
   const handleAssignment = (itemId: string, assignment: ItemAssignment) => {
     setAssignments(prev => ({
@@ -117,16 +186,80 @@ export default function NewReceipt() {
     setProcessing(true)
 
     try {
-      // Here you would save the receipt and assignments to Supabase
-      await new Promise(resolve => setTimeout(resolve, 2000)) // Simulate API call
+      // Calculate total amount
+      const total = items.reduce((sum, item) => sum + item.price, 0)
 
-      // Redirect to group summary
-      window.location.href = `/groups/${groupId}/summary`
-    } catch {
+      // Create receipt data with detailed item information
+      const receiptData = {
+        id: `receipt_${Date.now()}`,
+        storeName: 'Receipt', // TODO: Extract from OCR data
+        date: new Date().toISOString().split('T')[0],
+        total,
+        items: items.length,
+        status: 'pending' as const,
+        assignments,
+        itemDetails: items // Store actual item details for balance calculation
+      }
+
+      // Store in localStorage for immediate display (temporary solution)
+      const existingReceipts = JSON.parse(localStorage.getItem(`receipts_${groupId}`) || '[]')
+      existingReceipts.push(receiptData)
+      localStorage.setItem(`receipts_${groupId}`, JSON.stringify(existingReceipts))
+
+      // TODO: Also save to database
+      try {
+        await fetch('/api/receipts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            groupId,
+            storeName: receiptData.storeName,
+            items,
+            assignments,
+            total
+          }),
+        })
+      } catch (dbError) {
+        console.error('Database save failed:', dbError)
+        // Continue anyway since we have localStorage backup
+      }
+
+      // Redirect to main group page (now includes all summary functionality)
+      window.location.href = `/groups/${groupId}`
+    } catch (error) {
+      console.error('Error saving receipt:', error)
       setError('Failed to save receipt assignments')
     } finally {
       setProcessing(false)
     }
+  }
+
+  const handleEditItem = (itemId: string, field: string, value: string | number) => {
+    setItems(prev => prev.map(item =>
+      item.id === itemId ? { ...item, [field]: value } : item
+    ))
+  }
+
+  const handleAddItem = () => {
+    const newItem: ReceiptItem = {
+      id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: '',
+      price: 0,
+      quantity: 1
+    }
+    setItems(prev => [...prev, newItem])
+  }
+
+  const handleRemoveItem = (itemId: string) => {
+    setItems(prev => prev.filter(item => item.id !== itemId))
+    // Clear assignments for removed items
+    setAssignments(prev => {
+      const newAssignments = { ...prev }
+      delete newAssignments[itemId]
+      return newAssignments
+    })
   }
 
   const currentItem = items[currentItemIndex]
@@ -191,9 +324,19 @@ export default function NewReceipt() {
                 Back to Group
               </Link>
             </Button>
-            <Badge variant="secondary">
-              {totalAssignments} of {items.length} assigned
-            </Badge>
+            <div className="flex gap-2 items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEditItems(true)}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Items
+              </Button>
+              <Badge variant="secondary">
+                {totalAssignments} of {items.length} assigned
+              </Badge>
+            </div>
           </div>
         </div>
       </header>
@@ -233,21 +376,62 @@ export default function NewReceipt() {
                   </p>
 
                   {/* Assignment Summary */}
-                  <div className="space-y-2 mb-8 text-left">
-                    {items.map(item => {
-                      const assignment = assignments[item.id]
-                      return (
-                        <div key={item.id} className="flex justify-between items-center py-2 border-b last:border-0">
-                          <span className="font-medium">{item.name}</span>
-                          <Badge variant="outline">
-                            {assignment?.type === 'self' && 'You'}
-                            {assignment?.type === 'member' && assignment.memberName}
-                            {assignment?.type === 'split' && 'Split evenly'}
-                            {assignment?.type === 'custom' && 'Custom split'}
-                          </Badge>
-                        </div>
-                      )
-                    })}
+                  <div className="space-y-4 mb-8 text-left">
+                    {/* Per-user totals */}
+                    <div className="bg-secondary/20 rounded-lg p-4">
+                      <h3 className="font-semibold text-lg mb-3">Cost Summary</h3>
+                      <div className="space-y-2">
+                        {(() => {
+                          const userTotals: Record<string, number> = {}
+
+                          items.forEach(item => {
+                            const assignment = assignments[item.id]
+                            if (assignment?.type === 'self') {
+                              userTotals['You'] = (userTotals['You'] || 0) + item.price
+                            } else if (assignment?.type === 'member' && assignment.memberName) {
+                              userTotals[assignment.memberName] = (userTotals[assignment.memberName] || 0) + item.price
+                            } else if (assignment?.type === 'split') {
+                              const splitAmount = item.price / (groupMembers.length + 1) // +1 for current user
+                              userTotals['You'] = (userTotals['You'] || 0) + splitAmount
+                              groupMembers.forEach(member => {
+                                userTotals[member.name] = (userTotals[member.name] || 0) + splitAmount
+                              })
+                            }
+                          })
+
+                          return Object.entries(userTotals).map(([userName, total]) => (
+                            <div key={userName} className="flex justify-between items-center">
+                              <span className="font-medium">{userName}</span>
+                              <span className="font-bold">R{total.toFixed(2)}</span>
+                            </div>
+                          ))
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Item assignments */}
+                    <div>
+                      <h3 className="font-semibold text-lg mb-3">Item Assignments</h3>
+                      <div className="space-y-2">
+                        {items.map(item => {
+                          const assignment = assignments[item.id]
+                          return (
+                            <div key={item.id} className="flex justify-between items-center py-2 border-b last:border-0">
+                              <div>
+                                <span className="font-medium">{item.name}</span>
+                                <span className="text-sm text-muted-foreground ml-2">R{item.price.toFixed(2)}</span>
+                              </div>
+                              <Badge variant="outline">
+                                {assignment?.type === 'self' && 'You'}
+                                {assignment?.type === 'member' && assignment.memberName}
+                                {assignment?.type === 'split' && 'Split evenly'}
+                                {assignment?.type === 'custom' && 'Custom split'}
+                              </Badge>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
                   </div>
 
                   <motion.div
@@ -286,7 +470,7 @@ export default function NewReceipt() {
               <SwipeableItemCard
                 item={currentItem}
                 groupMembers={groupMembers}
-                currentUser={currentUser}
+                currentUser={currentUser || { id: '1', name: 'You' }}
                 onAssign={handleAssignment}
               />
 
@@ -318,6 +502,132 @@ export default function NewReceipt() {
           ) : null}
         </AnimatePresence>
       </main>
+
+      {/* Edit Items Modal */}
+      {showEditItems && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowEditItems(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-4xl max-h-[80vh] overflow-y-auto"
+          >
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <CardTitle className="flex items-center">
+                    <Edit className="w-5 h-5 mr-2" />
+                    Edit Receipt Items
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    onClick={handleAddItem}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Item
+                  </Button>
+                </div>
+
+                <div className="space-y-4 max-h-60 overflow-y-auto mb-6">
+                  {items.map((item, index) => (
+                    <div key={item.id} className="flex gap-3 items-center p-4 border rounded-lg bg-gray-50">
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Item Name</label>
+                          <input
+                            type="text"
+                            value={item.name}
+                            onChange={(e) => handleEditItem(item.id, 'name', e.target.value)}
+                            className="w-full px-3 py-2 border border-input rounded text-sm bg-white"
+                            placeholder="Enter item name"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Price (each)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={item.price}
+                            onChange={(e) => handleEditItem(item.id, 'price', parseFloat(e.target.value) || 0)}
+                            className="w-full px-3 py-2 border border-input rounded text-sm bg-white"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Quantity</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => handleEditItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                            className="w-full px-3 py-2 border border-input rounded text-sm bg-white"
+                            placeholder="1"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <div className="text-xs text-muted-foreground">Total</div>
+                        <div className="font-bold text-sm">R{(item.price * item.quantity).toFixed(2)}</div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveItem(item.id)}
+                          className="text-destructive hover:text-destructive p-1 h-8 w-8"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {items.length === 0 && (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <p className="mb-2">No items yet</p>
+                    <p className="text-sm">Click "Add Item" to start adding items to your receipt</p>
+                  </div>
+                )}
+
+                {/* Total Summary */}
+                <div className="p-4 bg-secondary/20 rounded-lg mb-6">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Receipt Total:</span>
+                    <span className="text-xl font-bold">
+                      R{items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {items.length} item{items.length !== 1 ? 's' : ''} total
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowEditItems(false)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => setShowEditItems(false)}
+                    className="flex-1"
+                    disabled={items.length === 0 || items.some(item => !item.name.trim())}
+                  >
+                    Done Editing
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   )
 }

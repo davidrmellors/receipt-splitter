@@ -53,37 +53,101 @@ export default function GroupSummary() {
 
 
   useEffect(() => {
-    // In a real app, this would fetch data from Supabase
-    // For now, using mock data
-    setBalances([
-      { userId: '1', userName: 'You', owes: 15.50, owed: 22.75, net: 7.25 },
-      { userId: '2', userName: 'Alice', owes: 8.25, owed: 12.00, net: 3.75 },
-      { userId: '3', userName: 'Bob', owes: 25.00, owed: 5.50, net: -19.50 },
-      { userId: '4', userName: 'Charlie', owes: 12.00, owed: 20.50, net: 8.50 }
-    ])
+    const fetchData = async () => {
+      try {
+        // Fetch receipts from localStorage (temporary solution)
+        const localReceipts = JSON.parse(localStorage.getItem(`receipts_${groupId}`) || '[]')
+        setReceipts(localReceipts)
 
-    setReceipts([
-      { id: '1', storeName: 'McDonald\'s', date: '2024-01-15', total: 45.50, items: 4, status: 'pending' },
-      { id: '2', storeName: 'Grocery Store', date: '2024-01-14', total: 87.25, items: 12, status: 'settled' },
-      { id: '3', storeName: 'Pizza Hut', date: '2024-01-13', total: 32.99, items: 2, status: 'pending' }
-    ])
+        // Calculate balances from receipts
+        if (localReceipts.length > 0) {
+          // Fetch group members to calculate balances
+          const membersResponse = await fetch(`/api/groups/${groupId}/members`)
+          if (membersResponse.ok) {
+            const members = await membersResponse.json()
+            const balances = calculateBalances(localReceipts, members)
+            setBalances(balances)
+          }
+        }
 
-    setPayments([
-      {
-        id: '1',
-        fromUser: '3',
-        fromUserName: 'Bob',
-        toUser: '1',
-        toUserName: 'You',
-        amount: 19.50,
-        date: '2024-01-15',
-        description: 'McDonald\'s receipt',
-        status: 'pending'
+        // TODO: Implement payment calculations
+        setPayments([])
+      } catch (error) {
+        console.error('Failed to fetch summary data:', error)
+        // Show empty states on error
+        setBalances([])
+        setReceipts([])
+        setPayments([])
+      } finally {
+        setLoading(false)
       }
-    ])
+    }
 
-    setLoading(false)
-  }, [])
+    fetchData()
+  }, [groupId])
+
+  // Calculate balances from receipts and assignments
+  const calculateBalances = (receipts: any[], members: any[]): Balance[] => {
+    const balanceMap: Record<string, { owes: number; owed: number; name: string }> = {}
+
+    // Initialize balance map
+    members.forEach(member => {
+      balanceMap[member.id] = {
+        owes: 0,
+        owed: 0,
+        name: member.nickname === 'You' ? 'You' : member.nickname
+      }
+    })
+
+    // Process each receipt's assignments
+    receipts.forEach(receipt => {
+      if (receipt.assignments && receipt.itemDetails) {
+        // Find who paid for the receipt (assume current user for now)
+        const payerId = members.find(m => m.user_id)?.id
+
+        Object.entries(receipt.assignments).forEach(([itemId, assignment]: [string, any]) => {
+          // Find the actual item price from itemDetails
+          const item = receipt.itemDetails.find((item: any) => item.id === itemId)
+          if (!item) return
+
+          const itemPrice = item.price
+
+          if (assignment.type === 'self') {
+            // Current user owes themselves nothing
+            // No balance change needed
+          } else if (assignment.type === 'member' && assignment.assignedTo) {
+            // Someone else was assigned this item - they owe the payer
+            if (balanceMap[assignment.assignedTo] && payerId) {
+              balanceMap[assignment.assignedTo].owes += itemPrice
+              if (balanceMap[payerId]) {
+                balanceMap[payerId].owed += itemPrice
+              }
+            }
+          } else if (assignment.type === 'split') {
+            // Split evenly among all members
+            const splitAmount = itemPrice / members.length
+            members.forEach(member => {
+              if (member.id !== payerId && balanceMap[member.id]) {
+                balanceMap[member.id].owes += splitAmount
+                if (balanceMap[payerId]) {
+                  balanceMap[payerId].owed += splitAmount
+                }
+              }
+            })
+          }
+        })
+      }
+    })
+
+    // Convert to Balance array format
+    return Object.entries(balanceMap).map(([userId, balance]) => ({
+      userId,
+      userName: balance.name,
+      owes: Math.round(balance.owes * 100) / 100, // Round to 2 decimal places
+      owed: Math.round(balance.owed * 100) / 100,
+      net: Math.round((balance.owed - balance.owes) * 100) / 100
+    })).filter(balance => balance.owes > 0 || balance.owed > 0) // Only show balances with amounts
+  }
 
   const handleMarkAsPaid = async (paymentId: string) => {
     setPayments(prev =>
@@ -146,7 +210,7 @@ export default function GroupSummary() {
                 <div className="flex items-center space-x-2">
                   <DollarSign className="h-5 w-5 text-primary" />
                   <div className="text-lg sm:text-2xl font-bold text-primary">
-                    ${totalGroupExpenses.toFixed(2)}
+                    R{totalGroupExpenses.toFixed(2)}
                   </div>
                 </div>
                 <div className="text-xs sm:text-sm text-muted-foreground mt-1">
@@ -211,8 +275,15 @@ export default function GroupSummary() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="divide-y">
-                  {balances.map((balance, index) => (
+                {balances.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                    <p className="text-lg font-medium mb-2">No balances yet</p>
+                    <p className="text-sm">Balances will appear here after you add and assign receipts</p>
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {balances.map((balance, index) => (
                     <motion.div
                       key={balance.userId}
                       initial={{ opacity: 0, y: 10 }}
@@ -229,7 +300,7 @@ export default function GroupSummary() {
                         <div>
                           <div className="font-medium">{balance.userName}</div>
                           <div className="text-sm text-muted-foreground">
-                            Owes: ${balance.owes.toFixed(2)} • Owed: ${balance.owed.toFixed(2)}
+                            Owes: R{balance.owes.toFixed(2)} • Owed: R{balance.owed.toFixed(2)}
                           </div>
                         </div>
                       </div>
@@ -239,7 +310,7 @@ export default function GroupSummary() {
                             balance.net > 0 ? 'text-green-600' : balance.net < 0 ? 'text-destructive' : 'text-muted-foreground'
                           }`}
                         >
-                          {balance.net > 0 ? '+' : ''}${balance.net.toFixed(2)}
+                          {balance.net > 0 ? '+' : ''}R{balance.net.toFixed(2)}
                         </div>
                         {balance.net < 0 && (
                           <Button
@@ -253,7 +324,8 @@ export default function GroupSummary() {
                       </div>
                     </motion.div>
                   ))}
-                </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -271,8 +343,21 @@ export default function GroupSummary() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="divide-y max-h-96 overflow-y-auto">
-                  {receipts.map((receipt, index) => (
+                {receipts.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    <Receipt className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                    <p className="text-lg font-medium mb-2">No receipts yet</p>
+                    <p className="text-sm mb-4">Start by scanning your first receipt</p>
+                    <Button asChild size="sm">
+                      <Link href={`/groups/${groupId}/scan`}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Scan Receipt
+                      </Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="divide-y max-h-96 overflow-y-auto">
+                    {receipts.map((receipt, index) => (
                     <motion.div
                       key={receipt.id}
                       initial={{ opacity: 0, y: 10 }}
@@ -288,7 +373,7 @@ export default function GroupSummary() {
                           </div>
                         </div>
                         <div className="text-right space-y-1">
-                          <div className="font-semibold">${receipt.total.toFixed(2)}</div>
+                          <div className="font-semibold">R{receipt.total.toFixed(2)}</div>
                           <Badge
                             variant={receipt.status === 'settled' ? 'default' : 'secondary'}
                             className="text-xs"
@@ -299,7 +384,8 @@ export default function GroupSummary() {
                       </div>
                     </motion.div>
                   ))}
-                </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -332,7 +418,7 @@ export default function GroupSummary() {
                       </div>
                       <div className="flex items-center justify-between sm:justify-end sm:space-x-3">
                         <div className="text-lg font-semibold">
-                          ${payment.amount.toFixed(2)}
+                          R{payment.amount.toFixed(2)}
                         </div>
                         {payment.toUser === '1' && ( // Current user is owed money
                           <Button

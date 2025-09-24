@@ -72,8 +72,15 @@ export default function SwipeableItemCard({
         // Left swipe - assign to self
         onAssign(item.id, { type: 'self' })
       } else if (swipeX > SWIPE_THRESHOLD) {
-        // Right swipe - show member selection
-        setShowMemberSelect(true)
+        // Right swipe - assign to member or show selection
+        if (groupMembers.length === 1) {
+          // Only one other member - auto-assign
+          handleMemberSelect(groupMembers[0])
+        } else if (groupMembers.length > 1) {
+          // Multiple members - show selection modal
+          setShowMemberSelect(true)
+        }
+        // If no members, do nothing
       }
     } else {
       // Vertical swipe
@@ -166,7 +173,7 @@ export default function SwipeableItemCard({
           <div className="text-center">
             <h3 className="text-xl font-semibold text-gray-900 mb-2">{item.name}</h3>
             <div className="text-3xl font-bold text-blue-600 mb-2">
-              ${item.price.toFixed(2)}
+              R{item.price.toFixed(2)}
             </div>
             {item.quantity > 1 && (
               <div className="text-sm text-gray-600">Qty: {item.quantity}</div>
@@ -201,15 +208,22 @@ export default function SwipeableItemCard({
           >
             <h3 className="text-lg font-semibold mb-4">Assign to:</h3>
             <div className="space-y-2">
-              {groupMembers.map((member) => (
-                <button
-                  key={member.id}
-                  onClick={() => handleMemberSelect(member)}
-                  className="w-full text-left p-3 rounded-lg hover:bg-gray-50 border"
-                >
-                  {member.name}
-                </button>
-              ))}
+              {groupMembers.length > 0 ? (
+                groupMembers.map((member) => (
+                  <button
+                    key={member.id}
+                    onClick={() => handleMemberSelect(member)}
+                    className="w-full text-left p-3 rounded-lg hover:bg-gray-50 border"
+                  >
+                    {member.name}
+                  </button>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p className="mb-2">No other members in this group</p>
+                  <p className="text-sm">Invite more people to split expenses with!</p>
+                </div>
+              )}
             </div>
             <button
               onClick={() => setShowMemberSelect(false)}
@@ -271,7 +285,7 @@ function CustomSplitModal({ item, groupMembers, onSave, onCancel }: CustomSplitM
         className="bg-white rounded-lg p-6 max-w-md w-full"
       >
         <h3 className="text-lg font-semibold mb-4">
-          Split {item.name} (${item.price.toFixed(2)})
+          Split {item.name} (R{item.price.toFixed(2)})
         </h3>
 
         <div className="space-y-3">
@@ -300,12 +314,12 @@ function CustomSplitModal({ item, groupMembers, onSave, onCancel }: CustomSplitM
         <div className="mt-4 pt-4 border-t">
           <div className="flex justify-between text-sm">
             <span>Total assigned:</span>
-            <span>${totalSplit.toFixed(2)}</span>
+            <span>R{totalSplit.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span>Remaining:</span>
             <span className={remaining > 0.01 ? 'text-red-600' : 'text-green-600'}>
-              ${remaining.toFixed(2)}
+              R{remaining.toFixed(2)}
             </span>
           </div>
         </div>
