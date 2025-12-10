@@ -72,7 +72,7 @@ A modern web application for splitting bills and receipts among groups. Scan rec
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/davidrmellors/receipt-splitter.git
 cd receipt-splitter
 ```
 
