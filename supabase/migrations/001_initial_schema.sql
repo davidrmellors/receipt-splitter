@@ -1,6 +1,3 @@
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 -- Create users table (extends Supabase auth.users)
 CREATE TABLE public.users (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -14,7 +11,7 @@ CREATE TABLE public.users (
 
 -- Create groups table
 CREATE TABLE public.groups (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   description TEXT,
   created_by UUID REFERENCES public.users(id) ON DELETE CASCADE,
@@ -24,7 +21,7 @@ CREATE TABLE public.groups (
 
 -- Create group_members table (many-to-many)
 CREATE TABLE public.group_members (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id UUID REFERENCES public.groups(id) ON DELETE CASCADE,
   user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
   nickname TEXT, -- Optional nickname for the user in this group
@@ -34,7 +31,7 @@ CREATE TABLE public.group_members (
 
 -- Create receipts table
 CREATE TABLE public.receipts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id UUID REFERENCES public.groups(id) ON DELETE CASCADE,
   uploaded_by UUID REFERENCES public.users(id) ON DELETE CASCADE,
   image_url TEXT NOT NULL,
@@ -48,7 +45,7 @@ CREATE TABLE public.receipts (
 
 -- Create receipt_items table
 CREATE TABLE public.receipt_items (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   receipt_id UUID REFERENCES public.receipts(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   price DECIMAL(10, 2) NOT NULL,
@@ -60,7 +57,7 @@ CREATE TABLE public.receipt_items (
 
 -- Create item_assignments table (tracks who pays for what)
 CREATE TABLE public.item_assignments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   item_id UUID REFERENCES public.receipt_items(id) ON DELETE CASCADE,
   assigned_to UUID REFERENCES public.users(id) ON DELETE CASCADE,
   amount DECIMAL(10, 2) NOT NULL, -- Amount this person owes for this item
@@ -70,7 +67,7 @@ CREATE TABLE public.item_assignments (
 
 -- Create payments table (tracks who has paid what)
 CREATE TABLE public.payments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   from_user UUID REFERENCES public.users(id) ON DELETE CASCADE,
   to_user UUID REFERENCES public.users(id) ON DELETE CASCADE,
   group_id UUID REFERENCES public.groups(id) ON DELETE CASCADE,
@@ -83,7 +80,7 @@ CREATE TABLE public.payments (
 
 -- Create balances table (running totals of who owes what to whom)
 CREATE TABLE public.balances (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id UUID REFERENCES public.groups(id) ON DELETE CASCADE,
   debtor_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
   creditor_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
