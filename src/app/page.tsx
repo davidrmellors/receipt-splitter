@@ -25,11 +25,6 @@ export default function Home() {
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button asChild size="lg" className="px-8">
-              <Link href="/signup">
-                Get Started
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg" className="px-8">
               <Link href="/signin">
                 Sign In
               </Link>

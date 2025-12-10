@@ -154,23 +154,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
             </motion.div>
           </form>
 
-          <div className="mt-4 text-center">
-            {mode === 'signup' ? (
-              <p className="text-sm text-muted-foreground">
-                Already have an account?{' '}
-                <a href="/signin" className="text-primary hover:underline">
-                  Sign in
-                </a>
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Don&apos;t have an account?{' '}
-                <a href="/signup" className="text-primary hover:underline">
-                  Sign up
-                </a>
-              </p>
-            )}
-          </div>
         </CardContent>
       </Card>
     </motion.div>
