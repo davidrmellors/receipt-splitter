@@ -12,6 +12,43 @@ A modern web application for splitting bills and receipts among groups. Scan rec
 - 📊 **Payment Tracking**: Mark payments and settle balances
 - 📱 **Mobile-First Design**: Optimized for mobile devices with smooth animations
 
+## Screenshots
+
+### Authentication Flow
+<p float="left">
+  <img src="screenshots/landing-page.png" width="200" alt="Landing Page"/>
+  <img src="screenshots/sign-up-page.png" width="200" alt="Sign Up"/>
+  <img src="screenshots/sign-in-page.png" width="200" alt="Sign In"/>
+</p>
+
+### Home & Groups
+<p float="left">
+  <img src="screenshots/home-page.png" width="200" alt="Home Page"/>
+  <img src="screenshots/groups-page.png" width="200" alt="Groups Page"/>
+  <img src="screenshots/create-new-group-page.png" width="200" alt="Create New Group"/>
+  <img src="screenshots/individual-group-page.png" width="200" alt="Individual Group"/>
+</p>
+
+### Receipt Scanning & AI Processing
+<p float="left">
+  <img src="screenshots/scan-receipt-page.png" width="200" alt="Scan Receipt"/>
+  <img src="screenshots/analyzing-receipt-page.png" width="200" alt="Analyzing Receipt"/>
+  <img src="screenshots/edit-items-page.png" width="200" alt="Edit Items"/>
+</p>
+
+### Item Assignment
+<p float="left">
+  <img src="screenshots/swipe items page.png" width="200" alt="Swipe Items"/>
+  <img src="screenshots/custom-split-page.png" width="200" alt="Custom Split"/>
+</p>
+
+### Summary & Results
+<p float="left">
+  <img src="screenshots/group-page-after-receipt.png" width="200" alt="Group After Receipt"/>
+  <img src="screenshots/summary-page.png" width="200" alt="Summary"/>
+  <img src="screenshots/summary-page-continued.png" width="200" alt="Summary Continued"/>
+</p>
+
 ## Tech Stack
 
 - **Frontend**: Next.js 14, React 19, TypeScript, Tailwind CSS
